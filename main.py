@@ -3,7 +3,7 @@ from clustering import ClusteringModel
 from visualisasi import Visualization
 from rekomendasi import RecommendationSystem
 
-# Load data
+# Load dataste
 file_path = "bank.csv"
 loader = DataLoader(file_path)
 data = loader.load_data()
