@@ -3,6 +3,9 @@ from clustering import ClusteringModel
 from visualisasi import Visualization
 from rekomendasi import RecommendationSystem
 
+import streamlit as st
+st.title("Segmenku: Clustering dan Rekomendasi Produk Bank")
+
 # Load dataste
 file_path = "bank.csv"
 loader = DataLoader(file_path)
