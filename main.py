@@ -111,8 +111,7 @@ class MainApplication:
         else:
             self.show_dashboard(current_user)
 
-    # [Implementasi method lainnya tetap sama...]
-        def show_auth_page(self):
+    def show_auth_page(self):
         st.title("🔐 Login ke Sistem")
 
         if st.session_state.show_register:
@@ -122,7 +121,6 @@ class MainApplication:
 
         if st.button("Belum punya akun? Daftar di sini"):
             st.session_state.show_register = True
-
     def show_login_form(self):
         st.subheader("Login")
 
