@@ -196,6 +196,73 @@ class MainApplication:
         elif selected_menu == "📈 Laporan":
             self.show_reports()
 
+    def show_user_dashboard(self):
+        """Dashboard untuk user biasa"""
+        st.sidebar.title("Menu User")
+        menu_options = [
+            "🏠 Beranda",
+            "🎯 Rekomendasi Produk",
+            "📊 Profil Saya",
+            "📈 Riwayat"
+        ]
+
+        selected_menu = st.sidebar.selectbox("Pilih Menu:", menu_options)
+
+        if selected_menu == "🏠 Beranda":
+            self.show_user_home()
+        elif selected_menu == "🎯 Rekomendasi Produk":
+            self.show_user_recommendations()
+        elif selected_menu == "📊 Profil Saya":
+            self.show_user_profile()
+        elif selected_menu == "📈 Riwayat":
+            self.show_user_history()
+
+    def show_user_home(self):
+        """Halaman beranda user"""
+        st.header("🏠 Selamat Datang")
+        st.write("Selamat datang di Sistem Rekomendasi Produk Bank!")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("💡 Dapatkan rekomendasi produk bank yang sesuai dengan kebutuhan Anda")
+        with col2:
+            st.success("📊 Lihat profil dan riwayat transaksi Anda")
+
+    def show_user_recommendations(self):
+        """Halaman rekomendasi untuk user"""
+        st.header("🎯 Rekomendasi Produk")
+        st.write("Fitur rekomendasi akan segera tersedia")
+
+        # Placeholder untuk sistem rekomendasi
+        with st.form("recommendation_form"):
+            st.subheader("Preferensi Anda")
+            income = st.number_input("Pendapatan Bulanan (Rp)", min_value=0, value=5000000)
+            age = st.number_input("Usia", min_value=17, max_value=100, value=30)
+            risk_tolerance = st.selectbox("Toleransi Risiko", ["Rendah", "Sedang", "Tinggi"])
+
+            if st.form_submit_button("Dapatkan Rekomendasi"):
+                st.success("Rekomendasi berdasarkan profil Anda akan ditampilkan di sini")
+
+    def show_user_profile(self):
+        """Halaman profil user"""
+        st.header("📊 Profil Saya")
+        current_user = st.session_state.user_mgmt.get_current_user_info()
+
+        if current_user:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"**Username:** {current_user['username']}")
+                st.write(f"**Nama Lengkap:** {current_user['full_name']}")
+                st.write(f"**Email:** {current_user['email']}")
+            with col2:
+                st.write(f"**Role:** {current_user['role']}")
+                st.write(f"**Status:** {current_user.get('status', 'Active')}")
+
+    def show_user_history(self):
+        """Halaman riwayat user"""
+        st.header("📈 Riwayat")
+        st.write("Riwayat aktivitas Anda akan ditampilkan di sini")
+
     def show_admin_overview(self):
         """Overview dashboard admin"""
         st.header("📊 Overview Sistem")
@@ -261,18 +328,14 @@ class MainApplication:
 
                         with col_reject:
                             if st.button(f"❌ Tolak", key=f"reject_{row['username']}"):
-                                # Form untuk alasan penolakan
-                                with st.form(f"reject_form_{row['username']}"):
-                                    reason = st.text_area("Alasan penolakan:", key=f"reason_{row['username']}")
-                                    if st.form_submit_button("Konfirmasi Penolakan"):
-                                        reject_status, reject_msg = st.session_state.user_mgmt.reject_user(
-                                            row['username'], reason
-                                        )
-                                        if reject_status:
-                                            st.success(reject_msg)
-                                            st.rerun()
-                                        else:
-                                            st.error(reject_msg)
+                                reject_status, reject_msg = st.session_state.user_mgmt.reject_user(
+                                    row['username'], "Ditolak oleh admin"
+                                )
+                                if reject_status:
+                                    st.success(reject_msg)
+                                    st.rerun()
+                                else:
+                                    st.error(reject_msg)
         else:
             st.info("Tidak ada pengguna yang menunggu persetujuan")
 
