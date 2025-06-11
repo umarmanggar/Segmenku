@@ -5,7 +5,8 @@ import logging
 
 # Import modules
 from user_management import UserManagement, Dashboard, UserStatus
-from rekomendasi import SistemRekomendasiProduk
+from rekomendasi import SistemRekomendasi
+from visualisasi import VisualisasiData
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
