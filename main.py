@@ -112,6 +112,73 @@ class MainApplication:
             self.show_dashboard(current_user)
 
     # [Implementasi method lainnya tetap sama...]
+        def show_auth_page(self):
+        st.title("🔐 Login ke Sistem")
+
+        if st.session_state.show_register:
+            self.show_register_form()
+        else:
+            self.show_login_form()
+
+        if st.button("Belum punya akun? Daftar di sini"):
+            st.session_state.show_register = True
+
+    def show_login_form(self):
+        st.subheader("Login")
+
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+            success, msg, user_info = st.session_state.user_mgmt.login(username, password)
+            if success:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    def show_register_form(self):
+        st.subheader("Daftar Pengguna Baru")
+
+        username = st.text_input("Username (baru)")
+        password = st.text_input("Password", type="password")
+        full_name = st.text_input("Nama Lengkap")
+        email = st.text_input("Email")
+        phone = st.text_input("No. Telepon")
+
+        if st.button("Daftar"):
+            if username in st.session_state.user_mgmt.users:
+                st.warning("Username sudah terdaftar.")
+            else:
+                st.session_state.user_mgmt.users[username] = User(
+                    username=username,
+                    password=password,
+                    full_name=full_name,
+                    email=email,
+                    phone=phone
+                )
+                st.success("Pendaftaran berhasil! Silakan login.")
+                st.session_state.show_register = False
+    def show_dashboard(self, user_info):
+        st.title("🏦 Dashboard Sistem Rekomendasi Produk Bank")
+
+        st.sidebar.header("Menu")
+        menu_options = ["Beranda", "Profil", "Kelola Pengguna", "Sistem Rekomendasi"]
+        if user_info['role'] == UserRole.ADMIN.value:
+            menu_options.append("Edit Pengguna")
+
+        selected_menu = st.sidebar.selectbox("Pilih Menu:", menu_options)
+
+        if selected_menu == "Beranda":
+            self.show_home()
+        elif selected_menu == "Profil":
+            self.show_profile(user_info)
+        elif selected_menu == "Kelola Pengguna":
+            self.show_manage_users()
+        elif selected_menu == "Sistem Rekomendasi":
+            self.show_recommendation_system()
+        elif selected_menu == "Edit Pengguna" and user_info['role'] == UserRole.ADMIN.value:
+            self.show_edit_user_form()
 
     def show_edit_user_form(self):
         """Form edit pengguna yang lengkap"""
