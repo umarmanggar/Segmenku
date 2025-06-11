@@ -80,7 +80,6 @@ class UserManagement:
 
 class MainApplication:
     def __init__(self):
-        # Initialize session state
         if 'user_mgmt' not in st.session_state:
             st.session_state.user_mgmt = UserManagement()
         if 'page' not in st.session_state:
@@ -115,30 +114,32 @@ class MainApplication:
         st.title("🔐 Login ke Sistem")
 
         if st.session_state.show_register:
-            self.show_register_form()
+            self.show_register_page()
         else:
-            self.show_login_form()
+            self.show_login_page()
 
-        if st.button("Belum punya akun? Daftar di sini"):
-            st.session_state.show_register = True
-    def show_login_form(self):
-        st.subheader("Login")
+    def show_login_page(self):
+        st.subheader("Masuk ke akun Anda")
 
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
 
         if st.button("Login"):
-            success, msg, user_info = st.session_state.user_mgmt.login(username, password)
+            success, message, user_info = st.session_state.user_mgmt.login(username, password)
             if success:
-                st.success(msg)
+                st.success(message)
                 st.rerun()
             else:
-                st.error(msg)
+                st.error(message)
 
-    def show_register_form(self):
-        st.subheader("Daftar Pengguna Baru")
+        if st.button("Belum punya akun? Daftar di sini"):
+            st.session_state.show_register = True
+            st.rerun()
 
-        username = st.text_input("Username (baru)")
+    def show_register_page(self):
+        st.subheader("📋 Formulir Pendaftaran")
+
+        username = st.text_input("Username Baru")
         password = st.text_input("Password", type="password")
         full_name = st.text_input("Nama Lengkap")
         email = st.text_input("Email")
@@ -146,40 +147,54 @@ class MainApplication:
 
         if st.button("Daftar"):
             if username in st.session_state.user_mgmt.users:
-                st.warning("Username sudah terdaftar.")
+                st.error("Username sudah digunakan")
             else:
-                st.session_state.user_mgmt.users[username] = User(
-                    username=username,
-                    password=password,
-                    full_name=full_name,
-                    email=email,
-                    phone=phone
-                )
-                st.success("Pendaftaran berhasil! Silakan login.")
+                new_user = User(username=username, password=password, full_name=full_name, email=email, phone=phone)
+                st.session_state.user_mgmt.users[username] = new_user
+                st.success("Pendaftaran berhasil! Menunggu persetujuan admin.")
                 st.session_state.show_register = False
+                st.rerun()
+
+        if st.button("Sudah punya akun? Login di sini"):
+            st.session_state.show_register = False
+            st.rerun()
+
     def show_dashboard(self, user_info):
-        st.title("🏦 Dashboard Sistem Rekomendasi Produk Bank")
+        st.sidebar.title(f"Selamat datang, {user_info['full_name']} 👋")
+        menu = st.sidebar.radio("Navigasi", ["Beranda", "Profil", "Rekomendasi", "Edit User", "Logout"])
 
-        st.sidebar.header("Menu")
-        menu_options = ["Beranda", "Profil", "Kelola Pengguna", "Sistem Rekomendasi"]
-        if user_info['role'] == UserRole.ADMIN.value:
-            menu_options.append("Edit Pengguna")
-
-        selected_menu = st.sidebar.selectbox("Pilih Menu:", menu_options)
-
-        if selected_menu == "Beranda":
+        if menu == "Beranda":
             self.show_home()
-        elif selected_menu == "Profil":
+        elif menu == "Profil":
             self.show_profile(user_info)
-        elif selected_menu == "Kelola Pengguna":
-            self.show_manage_users()
-        elif selected_menu == "Sistem Rekomendasi":
+        elif menu == "Rekomendasi":
             self.show_recommendation_system()
-        elif selected_menu == "Edit Pengguna" and user_info['role'] == UserRole.ADMIN.value:
-            self.show_edit_user_form()
+        elif menu == "Edit User":
+            if user_info['role'] == 'admin':
+                self.show_edit_user_form()
+            else:
+                st.warning("Hanya admin yang dapat mengedit user.")
+        elif menu == "Logout":
+            st.session_state.user_mgmt.logout()
+            st.rerun()
+
+    def show_home(self):
+        st.title("🏠 Beranda")
+        st.write("Selamat datang di Sistem Rekomendasi Produk Bank. Silakan pilih menu di samping untuk melanjutkan.")
+
+    def show_profile(self, user_info):
+        st.title("👤 Profil Pengguna")
+
+        st.markdown("### Informasi Pengguna")
+        st.write(f"**Nama Lengkap:** {user_info['full_name']}")
+        st.write(f"**Username:** {user_info['username']}")
+        st.write(f"**Email:** {user_info['email']}")
+        st.write(f"**Nomor Telepon:** {user_info['phone']}")
+        st.write(f"**Peran:** {user_info['role'].capitalize()}")
+        st.write(f"**Status Akun:** {user_info['status'].capitalize()}")
+        st.write(f"**Tanggal Dibuat:** {user_info['created_at']}")
 
     def show_edit_user_form(self):
-        """Form edit pengguna yang lengkap"""
         st.subheader("⚙️ Edit Pengguna")
 
         users = st.session_state.user_mgmt.users
@@ -214,7 +229,6 @@ class MainApplication:
                 new_phone = st.text_input("Nomor Telepon", value=user.phone or "")
 
             if st.form_submit_button("Simpan Perubahan"):
-                # Update user data
                 user.full_name = new_full_name
                 user.email = new_email
                 user.role = UserRole(new_role)
@@ -225,16 +239,15 @@ class MainApplication:
                 st.rerun()
 
     def show_recommendation_system(self):
-        """Implementasi sistem rekomendasi untuk admin"""
         st.header("🎯 Sistem Rekomendasi")
         st.write("Fitur sistem rekomendasi untuk admin")
 
-        # Placeholder - bisa diisi dengan implementasi nyata
         with st.expander("📊 Statistik Rekomendasi"):
             st.write("Grafik dan statistik rekomendasi akan ditampilkan di sini")
 
         with st.expander("⚙️ Konfigurasi Rekomendasi"):
             st.write("Form konfigurasi aturan rekomendasi")
+
 
 if __name__ == "__main__":
     app = MainApplication()
