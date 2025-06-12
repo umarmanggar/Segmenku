@@ -384,7 +384,7 @@ class MainApplication:
         st.title("Proses Data dan Pemilihan Fitur")
         processor = st.session_state.processor
         with st.sidebar:
-            st.header("Log Proses (PD-005)")
+            st.header("Log Proses Data")
             log_content = '\n'.join(processor.audit_log) if processor.audit_log else "Belum ada proses yang dijalankan."
             st.code(log_content)
 
