@@ -2,6 +2,11 @@ import streamlit as st
 from datetime import datetime
 import logging
 from enum import Enum, auto
+import pandas as pd
+import time
+import base64
+from io import BytesIO
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -116,7 +121,7 @@ def show_login():
         submitted = st.form_submit_button("Login")
 
         if submitted:
-            success, message, user_data = user_mgmt.login(username, password)
+            success, message, user_data = st.session_state.user_mgmt.login(username, password)
             if success:
                 st.session_state['logged_in'] = True
                 st.session_state['user_data'] = user_data
@@ -125,7 +130,6 @@ def show_login():
                 st.experimental_rerun()
             else:
                 st.error(message)
-
 # Menu utama berdasarkan role
 def main_menu():
     st.sidebar.title("Menu Utama")
@@ -185,11 +189,14 @@ def show_dashboard():
 def show_data_management():
     st.title("Manajemen Data Nasabah")
 
+    from dataload import DataProcessor
+
     uploaded_file = st.file_uploader("Upload File CSV Nasabah", type=["csv"])
 
     if uploaded_file is not None:
         try:
             # Proses data
+            data_processor = DataProcessor(uploaded_file)
             success, df, message = data_processor.load_data()
             if success:
                 st.session_state['df'] = df
@@ -230,9 +237,7 @@ def show_data_management():
             else:
                 st.error(message)
         except Exception as e:
-            st.error(f"Error processing data: {str(e)}")
-
-# Halaman segmentasi nasabah
+            st.error(f"Error processing data: {str(e)}")# Halaman segmentasi nasabah
 def show_segmentation():
     st.title("Segmentasi Nasabah")
 
@@ -245,6 +250,7 @@ def show_segmentation():
     st.subheader("Parameter Segmentasi")
     n_clusters = st.slider("Jumlah Klaster", 2, 6, 4)
 
+    from clustering import SegmentasiNasabah
     if st.button("Jalankan Segmentasi"):
         with st.spinner("Sedang memproses segmentasi..."):
             global segmentasi
@@ -260,6 +266,7 @@ def show_segmentation():
                 st.dataframe(df_result[['Klaster'] + segmentasi.fitur_numerik].head())
 
                 # Visualisasi
+                from visualisasi import VisualisasiData
                 global visualisasi
                 visualisasi = VisualisasiData(df_result)
                 success_viz, img_base64, msg_viz = visualisasi.buat_pie_chart_klaster()
@@ -285,7 +292,8 @@ def show_recommendation():
         return
 
     df = st.session_state['df']
-
+    from rekomendasi import SistemRekomendasi
+    import base64
     st.subheader("Sistem Rekomendasi Produk")
     global sistem_rekomendasi
     sistem_rekomendasi = SistemRekomendasi(df)
@@ -326,6 +334,9 @@ def show_recommendation():
 
 # Halaman manajemen pengguna (admin only)
 def show_user_management():
+    from user_management import UserManagement
+    user_mgmt = UserManagement()
+
     st.title("Manajemen Pengguna")
 
     if st.session_state.get('user_data', {}).get('role') != UserRole.ADMIN.value:
@@ -360,9 +371,27 @@ def show_user_management():
     with tab3:
         st.subheader("Edit Pengguna")
         # Implementasi edit pengguna
+        with st.form("edit_user_form"):
+            username = st.selectbox("Pilih Pengguna", list(user_mgmt.users.keys()))
+            user = user_mgmt.users[username]
+            new_password = st.text_input("Password Baru", type="password")
+            new_full_name = st.text_input("Nama Lengkap", value=user.full_name)
+            new_email = st.text_input("Email", value=user.email)
+            new_role = st.selectbox("Role", [r.value for r in UserRole], index=list(UserRole).index(user.role))
+            new_status = st.selectbox("Status", [s.value for s in UserStatus], index=list(UserStatus).index(user.status))
 
+            submitted = st.form_submit_button("Simpan Perubahan")
+            if submitted:
+                # Implementasi simpan perubahan
+                user.password = new_password
+                user.full_name = new_full_name
+                user.email = new_email
+                user.role = UserRole(new_role)
+                user.status = UserStatus(new_status)
+                st.success(f"Pengguna {username} berhasil diperbarui")
 # Halaman visualisasi
 def show_visualization():
+    from visualisasi import VisualisasiData
     st.title("Visualisasi Data")
 
     if 'df' not in st.session_state or 'Klaster' not in st.session_state['df'].columns:
@@ -399,7 +428,6 @@ def show_visualization():
         if success_filter:
             st.image(BytesIO(base64.b64decode(hasil_filter['pie_chart'])))
             st.image(BytesIO(base64.b64decode(hasil_filter['bar_chart'])))
-
 # Aplikasi utama
 def main():
     if not st.session_state.get('logged_in'):
