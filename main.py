@@ -244,7 +244,7 @@ def show_data_management():
                 st.success(message)
 
                 # Validasi struktur data
-                expected_columns = ['usia', 'saldo', 'pendapatan', 'frekuensi_transaksi']
+                expected_columns = ['age', 'balance', 'duration', 'campaign']
                 success_val, msg_val = data_processor.validate_data_structure(expected_columns)
                 if success_val:
                     st.success(msg_val)
