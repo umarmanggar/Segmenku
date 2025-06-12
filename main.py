@@ -531,7 +531,7 @@ class MainApplication:
                 col1.metric("Produk Direkomendasikan", rec['produk'])
                 col2.metric("Skor Kecocokan", f"{rec['skor']}/100")
                 df_dl = pd.DataFrame([{'usia': rec['usia'], 'transaksi': rec['transaksi'], 'produk': rec['produk'], 'skor': rec['skor']}])
-                st.markdown(get_table_download_link(df_dl, "rekomendasi.csv", "Simpan Rekomendasi (RP-004)"), unsafe_allow_html=True)
+                st.markdown(get_table_download_link(df_dl, "rekomendasi.csv", "Simpan Rekomendasi"), unsafe_allow_html=True)
                 st.markdown("---")
                 st.subheader("Feedback User (RP-005)")
                 rating_options = ("⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐")
