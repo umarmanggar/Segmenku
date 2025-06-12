@@ -129,6 +129,9 @@ def initialize_session_state():
         st.session_state.user_data = {}
     if 'current_page' not in st.session_state:
         st.session_state.current_page = 'Dashboard'
+    # Initialize visualisasi globally or pass it as an argument
+    if 'visualisasi_object' not in st.session_state:
+        st.session_state['visualisasi_object'] = None
 
 # Fungsi utilitas
 def to_excel(df):
@@ -313,6 +316,7 @@ def show_segmentation():
                 try:
                     from visualisasi import VisualisasiData
                     visualisasi = VisualisasiData(df_result)
+                    st.session_state['visualisasi_object'] = visualisasi # Store the object in session state
                     success_viz, img_base64, msg_viz = visualisasi.buat_pie_chart_klaster()
                     if success_viz:
                         st.image(BytesIO(base64.b64decode(img_base64)), caption="Distribusi Klaster")
@@ -384,8 +388,10 @@ def show_recommendation():
 
 # Halaman manajemen pengguna (admin only)
 def show_user_management():
-    from user_management import UserManagement
-    user_mgmt = UserManagement()
+    # Ensure user_mgmt is initialized
+    if 'user_mgmt' not in st.session_state:
+        st.session_state.user_mgmt = UserManagement()
+    user_mgmt = st.session_state.user_mgmt
 
     st.title("Manajemen Pengguna")
 
@@ -415,33 +421,52 @@ def show_user_management():
 
             submitted = st.form_submit_button("Tambah Pengguna")
             if submitted:
-                # Implementasi tambah pengguna
-                st.success(f"Pengguna {username} berhasil ditambahkan")
+                # Add logic to add user to user_mgmt.users
+                if username not in user_mgmt.users:
+                    user_mgmt.users[username] = User(
+                        username=username,
+                        password=password,
+                        role=UserRole(role),
+                        full_name=full_name,
+                        email=email
+                    )
+                    st.success(f"Pengguna {username} berhasil ditambahkan")
+                else:
+                    st.error(f"Pengguna dengan username {username} sudah ada.")
 
     with tab3:
         st.subheader("Edit Pengguna")
         # Implementasi edit pengguna
-        with st.form("edit_user_form"):
-            username = st.selectbox("Pilih Pengguna", list(user_mgmt.users.keys()))
-            user = user_mgmt.users[username]
-            new_password = st.text_input("Password Baru", type="password")
-            new_full_name = st.text_input("Nama Lengkap", value=user.full_name)
-            new_email = st.text_input("Email", value=user.email)
-            new_role = st.selectbox("Role", [r.value for r in UserRole], index=list(UserRole).index(user.role))
-            new_status = st.selectbox("Status", [s.value for s in UserStatus], index=list(UserStatus).index(user.status))
+        if user_mgmt.users: # Ensure there are users to select
+            username_to_edit = st.selectbox("Pilih Pengguna", list(user_mgmt.users.keys()))
+            user = user_mgmt.users[username_to_edit]
+            with st.form("edit_user_form"):
+                new_password = st.text_input("Password Baru", type="password", value=user.password) # Pre-fill with current password
+                new_full_name = st.text_input("Nama Lengkap", value=user.full_name)
+                new_email = st.text_input("Email", value=user.email)
+                new_role = st.selectbox("Role", [r.value for r in UserRole], index=list(UserRole).index(user.role))
+                new_status = st.selectbox("Status", [s.value for s in UserStatus], index=list(UserStatus).index(user.status))
 
-            submitted = st.form_submit_button("Simpan Perubahan")
-            if submitted:
-                # Implementasi simpan perubahan
-                user.password = new_password
-                user.full_name = new_full_name
-                user.email = new_email
-                user.role = UserRole(new_role)
-                user.status = UserStatus(new_status)
-                st.success(f"Pengguna {username} berhasil diperbarui")
+                submitted = st.form_submit_button("Simpan Perubahan")
+                if submitted:
+                    # Implementasi simpan perubahan
+                    user.password = new_password
+                    user.full_name = new_full_name
+                    user.email = new_email
+                    user.role = UserRole(new_role)
+                    user.status = UserStatus(new_status)
+                    st.success(f"Pengguna {username_to_edit} berhasil diperbarui")
+        else:
+            st.info("Tidak ada pengguna untuk diedit.")
+
 # Halaman visualisasi
 def show_visualization():
-    from visualisasi import VisualisasiData
+    try:
+        from visualisasi import VisualisasiData
+    except ImportError:
+        st.error("Module 'visualisasi' tidak ditemukan. Pastikan file visualisasi.py ada di direktori yang sama.")
+        return
+
     st.title("Visualisasi Data")
 
     if 'df' not in st.session_state or 'Klaster' not in st.session_state['df'].columns:
@@ -449,9 +474,12 @@ def show_visualization():
         return
 
     df = st.session_state['df']
-    global visualisasi
-    if visualisasi is None:
-        visualisasi = VisualisasiData(df)
+
+    # Use the visualisasi object from session state, or create it if not present
+    if st.session_state['visualisasi_object'] is None or st.session_state['visualisasi_object'].df is not df:
+        st.session_state['visualisasi_object'] = VisualisasiData(df)
+    visualisasi = st.session_state['visualisasi_object']
+
 
     st.subheader("Visualisasi Segmentasi")
 
@@ -462,24 +490,39 @@ def show_visualization():
         success_pie, img_pie, msg_pie = visualisasi.buat_pie_chart_klaster()
         if success_pie:
             st.image(BytesIO(base64.b64decode(img_pie)))
+        else:
+            st.error(msg_pie)
 
     with col2:
         st.write("Distribusi Usia per Klaster")
         success_bar, img_bar, msg_bar = visualisasi.buat_bar_chart_usia()
         if success_bar:
             st.image(BytesIO(base64.b64decode(img_bar)))
+        else:
+            st.error(msg_bar)
 
     st.subheader("Filter Visualisasi")
-    fitur_filter = st.selectbox("Pilih Fitur untuk Filter", df.columns)
-    nilai_filter = st.selectbox("Pilih Nilai Filter", df[fitur_filter].unique())
+    # Ensure 'df' is available and has columns for filtering
+    if 'df' in st.session_state and not st.session_state['df'].empty:
+        fitur_filter = st.selectbox("Pilih Fitur untuk Filter", df.columns)
+        if fitur_filter: # Check if a feature is selected
+            nilai_filter = st.selectbox("Pilih Nilai Filter", df[fitur_filter].unique())
 
-    if st.button("Terapkan Filter"):
-        success_filter, hasil_filter, msg_filter = visualisasi.filter_dan_update_grafik(fitur_filter, nilai_filter)
-        if success_filter:
-            st.image(BytesIO(base64.b64decode(hasil_filter['pie_chart'])))
-            st.image(BytesIO(base64.b64decode(hasil_filter['bar_chart'])))
+            if st.button("Terapkan Filter"):
+                success_filter, hasil_filter, msg_filter = visualisasi.filter_dan_update_grafik(fitur_filter, nilai_filter)
+                if success_filter:
+                    st.image(BytesIO(base64.b64decode(hasil_filter['pie_chart'])), caption=f"Distribusi Klaster (Filtered by {fitur_filter}: {nilai_filter})")
+                    st.image(BytesIO(base64.b64decode(hasil_filter['bar_chart'])), caption=f"Distribusi Usia per Klaster (Filtered by {fitur_filter}: {nilai_filter})")
+                else:
+                    st.error(msg_filter)
+        else:
+            st.warning("Tidak ada fitur yang tersedia untuk filter.")
+    else:
+        st.warning("Tidak ada data untuk difilter.")
+
 # Aplikasi utama
 def main():
+    initialize_session_state() # Call initialization at the very beginning
     if not st.session_state.get('logged_in'):
         show_login()
     else:
