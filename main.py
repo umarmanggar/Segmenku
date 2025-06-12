@@ -298,7 +298,8 @@
 #     main()
 
 
-# DIUBAH: Mengimplementasikan UI untuk Tambah, Edit, dan Hapus Pengguna di halaman Manajemen Pengguna.
+# File: main.py
+# PERBAIKAN: Memperbaiki AttributeError karena kesalahan nama fungsi page_laporan.
 
 import streamlit as st
 import pandas as pd
@@ -316,21 +317,13 @@ from rekomendasi import SistemRekomendasi, RekomendasiIndividual
 
 # --- Inisialisasi State Aplikasi ---
 def initialize_session_state():
-    # User Management
     if 'user_mgmt' not in st.session_state: st.session_state.user_mgmt = UserManagement()
     if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-    if 'user_info' not in st.session_state: st.session_state.user_info = None
-
-    # Data Processing
     if 'processor' not in st.session_state: st.session_state.processor = DataProcessor()
     if 'processing_step' not in st.session_state: st.session_state.processing_step = '1_upload'
     if 'final_data' not in st.session_state: st.session_state.final_data = None
-
-    # Segmentation
     if 'clustered_data' not in st.session_state: st.session_state.clustered_data = None
     if 'segmenter_instance' not in st.session_state: st.session_state.segmenter_instance = None
-
-    # Individual Recommendation
     if 'rekomendasi_individual' not in st.session_state: st.session_state.rekomendasi_individual = RekomendasiIndividual()
     if 'last_recommendation' not in st.session_state: st.session_state.last_recommendation = None
 
@@ -375,10 +368,11 @@ class MainApplication:
                 if key != 'user_mgmt': del st.session_state[key]
             initialize_session_state(); st.rerun()
 
+        # PERBAIKAN DI SINI
         page_map = {
             "Proses Data": self.page_proses_data,
             "Segmentasi": self.page_segmentasi,
-            "Laporan & Rekomendasi Segmen": self.page_laporan_segmen,
+            "Laporan & Rekomendasi Segmen": self.page_laporan, # Nama fungsi diubah ke yang benar
             "Simulasi Rekomendasi": self.page_simulasi_rekomendasi,
             "Manajemen Pengguna": self.page_manajemen_pengguna,
         }
@@ -391,21 +385,19 @@ class MainApplication:
         processor = st.session_state.processor
         with st.sidebar:
             st.header("Log Proses (PD-005)")
-            log_content = '\n'.join(processor.audit_log) if processor.audit_log else "Belum ada proses."
+            log_content = '\n'.join(processor.audit_log) if processor.audit_log else "Belum ada proses yang dijalankan."
             st.code(log_content)
 
-        # LANGKAH 1: UPLOAD
         if st.session_state.processing_step == '1_upload':
-            st.subheader("1. Unggah Data (PD-001)")
+            st.subheader("1. Unggah Data")
             uploaded_file = st.file_uploader("Pilih file CSV", type=["csv"])
             if uploaded_file and st.button("Proses File"):
                 success, msg = processor.load_data(uploaded_file)
                 if success: st.success(msg); st.session_state.processing_step = '2_cleaning'; st.rerun()
                 else: st.error(msg)
 
-        # LANGKAH 2: CLEANING
         elif st.session_state.processing_step == '2_cleaning':
-            st.subheader("2. Pembersihan Data (PD-002)"); st.dataframe(processor.raw_data.head())
+            st.subheader("2. Pembersihan Data"); st.dataframe(processor.raw_data.head())
             col1, col2 = st.columns(2)
             missing_val = col1.radio("Metode Nilai Kosong:", ['Isi dengan Mean/Modus', 'Hapus Baris'])
             outlier = col2.radio("Metode Outlier:", ['Tidak Ada', 'Hapus Outlier (IQR)'])
@@ -414,9 +406,8 @@ class MainApplication:
                 if success: st.success(msg); st.session_state.processing_step = '3_feature_selection'; st.rerun()
                 else: st.error(msg)
 
-        # LANGKAH 3: PEMILIHAN FITUR
         elif st.session_state.processing_step == '3_feature_selection':
-            st.subheader("3. Pemilihan Fitur (PD-003)"); st.dataframe(processor.processed_data.head())
+            st.subheader("3. Pemilihan Fitur"); st.dataframe(processor.processed_data.head())
             all_cols = processor.processed_data.columns.tolist()
             selected = st.multiselect("Pilih fitur untuk analisis:", options=all_cols, default=all_cols)
             if st.button("Simpan Fitur & Lanjutkan"):
@@ -424,9 +415,8 @@ class MainApplication:
                 if success: st.success(msg); st.session_state.processing_step = '4_transform'; st.rerun()
                 else: st.error(msg)
 
-        # LANGKAH 4: TRANSFORMASI
         elif st.session_state.processing_step == '4_transform':
-            st.subheader("4. Transformasi Data (PD-004)"); st.dataframe(processor.processed_data.head())
+            st.subheader("4. Transformasi Data"); st.dataframe(processor.processed_data.head())
             scaler = st.radio("Metode Scaling:", ['StandardScaler (Z-score)', 'MinMaxScaler'])
             if st.button("Selesaikan Proses"):
                 success, msg = processor.transform_data(scaler)
@@ -435,7 +425,6 @@ class MainApplication:
                     st.session_state.processing_step = '5_done'; st.balloons(); st.rerun()
                 else: st.error(msg)
 
-        # LANGKAH 5: SELESAI
         elif st.session_state.processing_step == '5_done':
             st.header("✅ Proses Data Selesai"); st.dataframe(st.session_state.final_data.head())
             if st.button("Ulangi Proses"):
@@ -447,32 +436,30 @@ class MainApplication:
         if st.session_state.final_data is None:
             st.warning("Data belum diproses. Selesaikan di halaman 'Proses Data'."); return
 
-        st.subheader("Pengaturan Metode Segmentasi (SN-001)")
+        st.subheader("Pengaturan Metode Segmentasi")
         metode = st.radio("Pilih Metode:", ("K-Means", "DBSCAN"))
 
         params = {}
         if metode == "K-Means":
-            params['n_clusters'] = st.number_input("Jumlah Cluster (SN-002):", min_value=2, value=3, step=1)
+            params['n_clusters'] = st.number_input("Jumlah Cluster:", min_value=2, value=3, step=1)
 
-        if st.button("Jalankan Segmentasi (SN-003)"):
+        if st.button("Jalankan Segmentasi"):
             segmenter = Segmenter(data_asli=st.session_state.processor.raw_data.loc[st.session_state.final_data.index], data_proses=st.session_state.final_data)
             with st.spinner(f"Menjalankan {metode}..."):
                 success, df_result, message, score = segmenter.jalankan_segmentasi(metode, params)
             if success:
                 st.session_state.clustered_data = df_result; st.session_state.segmenter_instance = segmenter
                 st.success(message)
-                # SN-005: Evaluasi Hasil
                 if score is not None:
                     st.metric(label="Silhouette Score", value=f"{score:.4f}")
                     if score < 0.3: st.warning("Kualitas segmentasi mungkin kurang optimal (Skor < 0.3).")
             else: st.error(f"Gagal: {message}")
 
         if st.session_state.clustered_data is not None:
-            st.subheader("Hasil Segmentasi (SN-004)")
+            st.subheader("Hasil Segmentasi")
             st.dataframe(st.session_state.clustered_data)
             st.markdown(get_table_download_link(st.session_state.clustered_data, "hasil_segmentasi.csv", "Unduh Hasil (CSV)"), unsafe_allow_html=True)
             st.markdown("---")
-            # Fitur lihat detail anggota
             st.subheader("Lihat Detail Anggota per Segmen")
             segmenter = st.session_state.get('segmenter_instance')
             if segmenter:
@@ -489,7 +476,7 @@ class MainApplication:
 
         df_laporan = st.session_state.clustered_data.copy()
 
-        st.header("Visualisasi Interaktif (VD-001 s/d VD-005)")
+        st.header("Visualisasi Interaktif")
         visualizer = VisualisasiData(df_laporan)
         col1, col2 = st.columns(2)
         with col1:
@@ -503,7 +490,7 @@ class MainApplication:
             if fitur_pilihan:
                 bar_chart = visualizer.buat_bar_chart(fitur_pilihan)
                 if bar_chart: st.plotly_chart(bar_chart, use_container_width=True)
-        st.info("Arahkan mouse ke grafik untuk detail (VD-004) dan gunakan tombol di pojok kanan atas grafik untuk ekspor (VD-003).")
+        st.info("Arahkan mouse ke grafik untuk detail dan gunakan tombol di pojok kanan atas grafik untuk ekspor.")
 
         st.markdown("---")
         st.header("Rekomendasi Produk per Segmen")
@@ -521,24 +508,24 @@ class MainApplication:
                 st.dataframe(data_klaster)
 
     def page_simulasi_rekomendasi(self):
-        st.title("Simulasi Rekomendasi Individual (RP-001 s/d RP-005)")
+        st.title("Simulasi Rekomendasi Individual")
         recommender = st.session_state.rekomendasi_individual
         with st.form("recommendation_form"):
-            st.subheader("Input Parameter Nasabah (RP-001)")
+            st.subheader("Input Parameter Nasabah")
             col1, col2 = st.columns(2)
             usia = col1.number_input("Usia", min_value=0, step=1)
             transaksi = col2.number_input("Jml Transaksi/Bulan", min_value=0, step=1)
-            submitted = st.form_submit_button("Dapatkan Rekomendasi (RP-002)")
+            submitted = st.form_submit_button("Dapatkan Rekomendasi")
             if submitted:
                 if usia == 0 or transaksi == 0:
-                    st.error("Data tidak boleh kosong (RP-001-01).")
+                    st.error("Data tidak boleh kosong...")
                 else:
                     produk, skor = recommender.dapatkan_rekomendasi(usia, transaksi)
                     st.session_state.last_recommendation = {'produk': produk, 'skor': skor, 'usia': usia, 'transaksi': transaksi}
 
         if st.session_state.last_recommendation:
             rec = st.session_state.last_recommendation
-            st.subheader("Hasil Rekomendasi (RP-003)")
+            st.subheader("Hasil Rekomendasi")
             if rec['produk']:
                 col1, col2 = st.columns(2)
                 col1.metric("Produk Direkomendasikan", rec['produk'])
@@ -551,16 +538,15 @@ class MainApplication:
                 rating = st.radio("Rating Anda:", rating_options, key="rating", horizontal=True, index=None)
                 if st.button("Kirim Feedback"):
                     if rating is None:
-                        st.warning("Silakan beri rating terlebih dulu (RP-005-01).")
+                        st.warning("Silakan beri rating terlebih dulu")
                     else:
                         recommender.simpan_feedback(rec['produk'], len(rating))
                         st.success("Terima kasih atas feedback Anda!")
             else:
-                st.error("Tidak ada produk yang cocok untuk parameter ini (RP-003-01).")
+                st.error("Tidak ada produk yang cocok untuk parameter ini")
 
     def page_manajemen_pengguna(self):
-        st.title("Manajemen Pengguna (MU-001)")
-        # ... (Sama seperti sebelumnya)
+        st.title("Manajemen Pengguna")
         user_mgmt = st.session_state.user_mgmt
         tab1, tab2, tab3 = st.tabs(["Daftar", "Tambah", "Edit & Hapus"])
         with tab1: st.dataframe(user_mgmt.get_user_list_df(), use_container_width=True)
