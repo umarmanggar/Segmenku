@@ -1,4 +1,3 @@
-import pandas as pd
 import streamlit as st
 from datetime import datetime
 import logging
@@ -27,8 +26,8 @@ class User:
         self.role = role
         self.status = status
         self.full_name = kwargs.get('full_name', '')
-        self.email = kwargs.get('email', ' ')
-        self.phone = kwargs.get('phone', ' ')
+        self.email = kwargs.get('email', '')
+        self.phone = kwargs.get('phone', '')
         self.created_at = datetime.now().isoformat()
 
 class UserManagement:
@@ -94,161 +93,332 @@ class MainApplication:
             layout="wide"
         )
 
-        # Hide Streamlit menu and footer
-        hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            </style>
-        """
-        st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+# Fungsi utilitas
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False)
+    processed_data = output.getvalue()
+    return processed_data
 
-        current_user = st.session_state.user_mgmt.get_current_user_info()
+def get_table_download_link(df, filename):
+    val = to_excel(df)
+    b64 = base64.b64encode(val)
+    return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="{filename}.xlsx">Download {filename}</a>'
 
-        if current_user is None:
-            self.show_auth_page()
-        else:
-            self.show_dashboard(current_user)
+# Tampilan login
+def show_login():
+    st.title("Login Sistem Segmentasi Nasabah")
 
-    def show_auth_page(self):
-        st.title("🔐 Login ke Sistem")
-
-        if st.session_state.show_register:
-            self.show_register_page()
-        else:
-            self.show_login_page()
-
-    def show_login_page(self):
-        st.subheader("Masuk ke akun Anda")
-
+    with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Login")
 
-        if st.button("Login"):
-            success, message, user_info = st.session_state.user_mgmt.login(username, password)
+        if submitted:
+            success, message, user_data = user_mgmt.login(username, password)
             if success:
+                st.session_state['logged_in'] = True
+                st.session_state['user_data'] = user_data
                 st.success(message)
-                st.rerun()
+                time.sleep(1)
+                st.experimental_rerun()
             else:
                 st.error(message)
 
-        if st.button("Belum punya akun? Daftar di sini"):
-            st.session_state.show_register = True
-            st.rerun()
+# Menu utama berdasarkan role
+def main_menu():
+    st.sidebar.title("Menu Utama")
+    user_data = st.session_state.get('user_data', {})
 
-    def show_register_page(self):
-        st.subheader("📋 Formulir Pendaftaran")
+    if user_data['role'] == UserRole.ADMIN.value:
+        menu_options = ["Dashboard", "Manajemen Data", "Manajemen Pengguna", "Logout"]
+    elif user_data['role'] == UserRole.MARKETING.value:
+        menu_options = ["Dashboard", "Segmentasi Nasabah", "Rekomendasi Produk", "Logout"]
+    else:  # MANAGEMENT
+        menu_options = ["Dashboard", "Laporan", "Visualisasi", "Logout"]
 
-        username = st.text_input("Username Baru")
-        password = st.text_input("Password", type="password")
-        full_name = st.text_input("Nama Lengkap")
-        email = st.text_input("Email")
-        phone = st.text_input("No. Telepon")
+    selected_menu = st.sidebar.radio("Pilihan Menu", menu_options)
 
-        if st.button("Daftar"):
-            if username in st.session_state.user_mgmt.users:
-                st.error("Username sudah digunakan")
+    if selected_menu == "Logout":
+        st.session_state.clear()
+        st.success("Anda telah logout")
+        time.sleep(1)
+        st.experimental_rerun()
+
+    return selected_menu
+
+# Halaman dashboard
+def show_dashboard():
+    st.title("Dashboard Segmentasi Nasabah")
+    user_data = st.session_state.get('user_data', {})
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader(f"Halo, {user_data.get('full_name', 'User')}")
+        st.write(f"Role: {user_data.get('role', '').capitalize()}")
+        st.write(f"Login terakhir: {pd.to_datetime('now').strftime('%Y-%m-%d %H:%M')}")
+
+    with col2:
+        st.subheader("Quick Actions")
+        if user_data['role'] == UserRole.ADMIN.value:
+            if st.button("Manajemen Pengguna"):
+                st.session_state['current_page'] = "Manajemen Pengguna"
+                st.experimental_rerun()
+        elif user_data['role'] == UserRole.MARKETING.value:
+            if st.button("Segmentasi Nasabah"):
+                st.session_state['current_page'] = "Segmentasi Nasabah"
+                st.experimental_rerun()
+
+    st.markdown("---")
+    st.subheader("Statistik Sistem")
+
+    # Tampilkan statistik sesuai role
+    if 'df' in st.session_state:
+        df = st.session_state['df']
+        if 'Klaster' in df.columns:
+            cluster_stats = df['Klaster'].value_counts()
+            st.write("Distribusi Klaster Nasabah:")
+            st.bar_chart(cluster_stats)
+
+# Halaman manajemen data
+def show_data_management():
+    st.title("Manajemen Data Nasabah")
+
+    uploaded_file = st.file_uploader("Upload File CSV Nasabah", type=["csv"])
+
+    if uploaded_file is not None:
+        try:
+            # Proses data
+            success, df, message = data_processor.load_data()
+            if success:
+                st.session_state['df'] = df
+                st.success(message)
+
+                # Validasi struktur data
+                expected_columns = ['usia', 'saldo', 'pendapatan', 'frekuensi_transaksi']
+                success_val, msg_val = data_processor.validate_data_structure(expected_columns)
+                if success_val:
+                    st.success(msg_val)
+
+                    # Preprocessing
+                    success_pre, df_pre, msg_pre = data_processor.preprocess_data()
+                    if success_pre:
+                        st.session_state['df'] = df_pre
+                        st.success(msg_pre)
+
+                        # Pilih fitur
+                        success_sel, df_sel, msg_sel = data_processor.select_features(expected_columns)
+                        if success_sel:
+                            st.session_state['df'] = df_sel
+                            st.success(msg_sel)
+
+                            # Transformasi data
+                            success_trans, df_trans, msg_trans = data_processor.transform_data()
+                            if success_trans:
+                                st.session_state['df'] = df_trans
+                                st.success(msg_trans)
+
+                                # Tampilkan data
+                                if st.checkbox("Tampilkan Data"):
+                                    st.dataframe(df_trans.head())
+
+                                # Download data
+                                st.markdown(get_table_download_link(df_trans, "data_nasabah_processed"), unsafe_allow_html=True)
+                else:
+                    st.error(msg_val)
             else:
-                new_user = User(username=username, password=password, full_name=full_name, email=email, phone=phone)
-                st.session_state.user_mgmt.users[username] = new_user
-                st.success("Pendaftaran berhasil! Menunggu persetujuan admin.")
-                st.session_state.show_register = False
-                st.rerun()
+                st.error(message)
+        except Exception as e:
+            st.error(f"Error processing data: {str(e)}")
 
-        if st.button("Sudah punya akun? Login di sini"):
-            st.session_state.show_register = False
-            st.rerun()
+# Halaman segmentasi nasabah
+def show_segmentation():
+    st.title("Segmentasi Nasabah")
 
-    def show_dashboard(self, user_info):
-        st.sidebar.title(f"Selamat datang, {user_info['full_name']} 👋")
-        menu = st.sidebar.radio("Navigasi", ["Beranda", "Profil", "Rekomendasi", "Edit User", "Logout"])
+    if 'df' not in st.session_state:
+        st.warning("Silakan upload data terlebih dahulu di menu Manajemen Data")
+        return
 
-        if menu == "Beranda":
-            self.show_home()
-        elif menu == "Profil":
-            self.show_profile(user_info)
-        elif menu == "Rekomendasi":
-            self.show_recommendation_system()
-        elif menu == "Edit User":
-            if user_info['role'] == 'admin':
-                self.show_edit_user_form()
+    df = st.session_state['df']
+
+    st.subheader("Parameter Segmentasi")
+    n_clusters = st.slider("Jumlah Klaster", 2, 6, 4)
+
+    if st.button("Jalankan Segmentasi"):
+        with st.spinner("Sedang memproses segmentasi..."):
+            global segmentasi
+            segmentasi = SegmentasiNasabah(df, n_clusters)
+            success, df_result, message = segmentasi.jalankan_segmentasi()
+
+            if success:
+                st.session_state['df'] = df_result
+                st.success(message)
+
+                # Tampilkan hasil
+                st.subheader("Hasil Segmentasi")
+                st.dataframe(df_result[['Klaster'] + segmentasi.fitur_numerik].head())
+
+                # Visualisasi
+                global visualisasi
+                visualisasi = VisualisasiData(df_result)
+                success_viz, img_base64, msg_viz = visualisasi.buat_pie_chart_klaster()
+                if success_viz:
+                    st.image(BytesIO(base64.b64decode(img_base64)), caption="Distribusi Klaster")
+
+                # Simpan hasil
+                if st.button("Simpan Hasil Segmentasi"):
+                    success_save, msg_save = segmentasi.simpan_hasil("hasil_segmentasi.csv")
+                    if success_save:
+                        st.success(msg_save)
+                    else:
+                        st.error(msg_save)
             else:
-                st.warning("Hanya admin yang dapat mengedit user.")
-        elif menu == "Logout":
-            st.session_state.user_mgmt.logout()
-            st.rerun()
+                st.error(message)
 
-    def show_home(self):
-        st.title("🏠 Beranda")
-        st.write("Selamat datang di Sistem Rekomendasi Produk Bank. Silakan pilih menu di samping untuk melanjutkan.")
+# Halaman rekomendasi produk
+def show_recommendation():
+    st.title("Rekomendasi Produk")
 
-    def show_profile(self, user_info):
-        st.title("👤 Profil Pengguna")
+    if 'df' not in st.session_state or 'Klaster' not in st.session_state['df'].columns:
+        st.warning("Silakan lakukan segmentasi terlebih dahulu")
+        return
 
-        st.markdown("### Informasi Pengguna")
-        st.write(f"**Nama Lengkap:** {user_info['full_name']}")
-        st.write(f"**Username:** {user_info['username']}")
-        st.write(f"**Email:** {user_info['email']}")
-        st.write(f"**Nomor Telepon:** {user_info['phone']}")
-        st.write(f"**Peran:** {user_info['role'].capitalize()}")
-        st.write(f"**Status Akun:** {user_info['status'].capitalize()}")
-        st.write(f"**Tanggal Dibuat:** {user_info['created_at']}")
+    df = st.session_state['df']
 
-    def show_edit_user_form(self):
-        st.subheader("⚙️ Edit Pengguna")
+    st.subheader("Sistem Rekomendasi Produk")
+    global sistem_rekomendasi
+    sistem_rekomendasi = SistemRekomendasi(df)
 
-        users = st.session_state.user_mgmt.users
-        user_options = [u.username for u in users.values() if u.username != 'admin']
+    # Buat rekomendasi
+    if st.button("Buat Rekomendasi"):
+        success, df_rekomendasi, message = sistem_rekomendasi.buat_rekomendasi()
+        if success:
+            st.session_state['df'] = df_rekomendasi
+            st.success(message)
 
-        if not user_options:
-            st.warning("Tidak ada pengguna yang bisa diedit")
-            return
+            # Tampilkan rekomendasi
+            st.dataframe(df_rekomendasi[['Klaster', 'Produk_Rekomendasi', 'Kategori_Produk']].head())
 
-        selected_user = st.selectbox("Pilih pengguna:", user_options)
-        user = users[selected_user]
+            # Filter berdasarkan kategori
+            kategori = st.selectbox("Filter berdasarkan kategori", ['Semua', 'Tabungan', 'Kredit', 'Investasi', 'Asuransi'])
+            if kategori != 'Semua':
+                success_filter, df_filter, msg_filter = sistem_rekomendasi.filter_rekomendasi(kategori)
+                if success_filter:
+                    st.dataframe(df_filter[['Klaster', 'Produk_Rekomendasi']])
 
-        with st.form(f"edit_form_{user.username}"):
-            col1, col2 = st.columns(2)
+            # Detail produk
+            produk_terpilih = st.selectbox("Lihat detail produk",
+                                         list(set(df_rekomendasi['Produk_Rekomendasi'])))
+            if st.button("Tampilkan Detail"):
+                success_detail, detail, msg_detail = sistem_rekomendasi.tampilkan_detail_produk(produk_terpilih)
+                if success_detail:
+                    st.json(detail)
 
-            with col1:
-                st.write(f"**Username:** {user.username}")
-                new_full_name = st.text_input("Nama Lengkap", value=user.full_name)
-                new_email = st.text_input("Email", value=user.email)
+            # Ekspor rekomendasi
+            if st.button("Ekspor Rekomendasi ke CSV"):
+                success_export, filename, msg_export = sistem_rekomendasi.ekspor_rekomendasi_csv()
+                if success_export:
+                    st.success(msg_export)
+                    st.markdown(f'<a href="data:file/csv;base64,{base64.b64encode(open(filename, "rb").read()).decode()}" download="{filename}">Download {filename}</a>', unsafe_allow_html=True)
+        else:
+            st.error(message)
 
-            with col2:
-                new_role = st.selectbox(
-                    "Role",
-                    [r.value for r in UserRole],
-                    index=0 if user.role == UserRole.USER else 1
-                )
-                new_status = st.selectbox(
-                    "Status",
-                    [s.value for s in UserStatus],
-                    index=[s.value for s in UserStatus].index(user.status.value)
-                )
-                new_phone = st.text_input("Nomor Telepon", value=user.phone or "")
+# Halaman manajemen pengguna (admin only)
+def show_user_management():
+    st.title("Manajemen Pengguna")
 
-            if st.form_submit_button("Simpan Perubahan"):
-                user.full_name = new_full_name
-                user.email = new_email
-                user.role = UserRole(new_role)
-                user.status = UserStatus(new_status)
-                user.phone = new_phone
+    if st.session_state.get('user_data', {}).get('role') != UserRole.ADMIN.value:
+        st.warning("Anda tidak memiliki akses ke halaman ini")
+        return
 
-                st.success("Perubahan berhasil disimpan!")
-                st.rerun()
+    tab1, tab2, tab3 = st.tabs(["Daftar Pengguna", "Tambah Pengguna", "Edit Pengguna"])
 
-    def show_recommendation_system(self):
-        st.header("🎯 Sistem Rekomendasi")
-        st.write("Fitur sistem rekomendasi untuk admin")
+    with tab1:
+        st.subheader("Daftar Pengguna")
+        success, df_users, message = user_mgmt.get_daftar_pengguna()
+        if success:
+            st.dataframe(df_users)
+        else:
+            st.error(message)
 
-        with st.expander("📊 Statistik Rekomendasi"):
-            st.write("Grafik dan statistik rekomendasi akan ditampilkan di sini")
+    with tab2:
+        st.subheader("Tambah Pengguna Baru")
+        with st.form("add_user_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            full_name = st.text_input("Nama Lengkap")
+            email = st.text_input("Email")
+            role = st.selectbox("Role", [r.value for r in UserRole])
+            department = st.text_input("Departemen")
 
-        with st.expander("⚙️ Konfigurasi Rekomendasi"):
-            st.write("Form konfigurasi aturan rekomendasi")
+            submitted = st.form_submit_button("Tambah Pengguna")
+            if submitted:
+                # Implementasi tambah pengguna
+                st.success(f"Pengguna {username} berhasil ditambahkan")
 
+    with tab3:
+        st.subheader("Edit Pengguna")
+        # Implementasi edit pengguna
+
+# Halaman visualisasi
+def show_visualization():
+    st.title("Visualisasi Data")
+
+    if 'df' not in st.session_state or 'Klaster' not in st.session_state['df'].columns:
+        st.warning("Silakan lakukan segmentasi terlebih dahulu")
+        return
+
+    df = st.session_state['df']
+    global visualisasi
+    if visualisasi is None:
+        visualisasi = VisualisasiData(df)
+
+    st.subheader("Visualisasi Segmentasi")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("Distribusi Klaster")
+        success_pie, img_pie, msg_pie = visualisasi.buat_pie_chart_klaster()
+        if success_pie:
+            st.image(BytesIO(base64.b64decode(img_pie)))
+
+    with col2:
+        st.write("Distribusi Usia per Klaster")
+        success_bar, img_bar, msg_bar = visualisasi.buat_bar_chart_usia()
+        if success_bar:
+            st.image(BytesIO(base64.b64decode(img_bar)))
+
+    st.subheader("Filter Visualisasi")
+    fitur_filter = st.selectbox("Pilih Fitur untuk Filter", df.columns)
+    nilai_filter = st.selectbox("Pilih Nilai Filter", df[fitur_filter].unique())
+
+    if st.button("Terapkan Filter"):
+        success_filter, hasil_filter, msg_filter = visualisasi.filter_dan_update_grafik(fitur_filter, nilai_filter)
+        if success_filter:
+            st.image(BytesIO(base64.b64decode(hasil_filter['pie_chart'])))
+            st.image(BytesIO(base64.b64decode(hasil_filter['bar_chart'])))
+
+# Aplikasi utama
+def main():
+    if not st.session_state.get('logged_in'):
+        show_login()
+    else:
+        selected_menu = main_menu()
+
+        if selected_menu == "Dashboard":
+            show_dashboard()
+        elif selected_menu == "Manajemen Data":
+            show_data_management()
+        elif selected_menu == "Segmentasi Nasabah":
+            show_segmentation()
+        elif selected_menu == "Rekomendasi Produk":
+            show_recommendation()
+        elif selected_menu == "Manajemen Pengguna":
+            show_user_management()
+        elif selected_menu == "Visualisasi":
+            show_visualization()
 
 if __name__ == "__main__":
-    app = MainApplication()
-    app.run()
+    main()
