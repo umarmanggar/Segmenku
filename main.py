@@ -555,6 +555,7 @@ import time
 from io import BytesIO
 import base64
 import numpy as np
+import database as db
 
 # --- Impor Modul Aplikasi ---
 from user_management import UserManagement, UserRole
@@ -696,10 +697,12 @@ def show_data_management():
                     success_trans, df_trans, msg_trans = processor.transform_data()
 
                 if success_trans:
-                    st.session_state.df_processed = df_trans
-                    st.success("Data berhasil diproses dan siap untuk segmentasi!")
+                    with st.spinner("Menyimpan data ke database..."):
+                        db.save_dataframe(df_trans, 'processed_data')
+
+                    st.success("Data berhasil diproses dan disimpan ke database untuk diakses peran lain!")
                     st.write("Data setelah transformasi:")
-                    st.dataframe(st.session_state.df_processed.head())
+                    st.dataframe(df_trans.head())
                 else:
                     st.error(msg_trans)
         else:
@@ -711,6 +714,13 @@ def show_segmentation():
     if st.session_state.df_processed is None:
         st.warning("Data belum diproses. Silakan proses data di halaman 'Manajemen Data'.")
         return
+
+    df_processed = db.load_dataframe('processed_data')
+    if df_processed is None or df_processed.empty:
+        st.warning("Data belum diolah dan disimpan oleh Admin. Silakan hubungi Admin untuk memproses data terlebih dahulu.")
+        return
+
+    st.info("Data yang telah diproses oleh Admin berhasil dimuat.")
 
     st.subheader("Parameter K-Means")
     # REQ-1.2: Administrator dapat mengonfigurasi jumlah cluster
@@ -773,6 +783,16 @@ def show_recommendation():
 # Halaman: Laporan & Visualisasi (Skenario VD-01)
 def show_visualization():
     st.title("Laporan dan Visualisasi")
+    if 'df_clustered' in st.session_state and st.session_state.df_clustered is not None:
+        df = st.session_state.df_clustered
+        st.info("Menampilkan data dari sesi segmentasi saat ini.")
+    else:
+        df = db.load_dataframe('clustered_data')
+        if df is None or df.empty:
+            st.warning("Data belum disegmentasi. Silakan jalankan proses di halaman 'Segmentasi Nasabah'.")
+            return
+        st.info("Berhasil memuat data segmentasi terakhir dari database.")
+        
     if st.session_state.df_clustered is None:
         st.warning("Data belum disegmentasi.")
         return
@@ -820,9 +840,10 @@ def show_user_management():
 # --- Logika Utama Aplikasi ---
 def main():
     """Fungsi utama untuk menjalankan alur aplikasi."""
+    db.init_db()  # Inisialisasi database
     initialize_session_state()
 
-    if not st.session_state.logged_in:
+    if not st.session_state.get('logged_in'):
         show_login_page()
     else:
         st.set_page_config(page_title="Dashboard - Segmentasi Nasabah", layout="wide")
