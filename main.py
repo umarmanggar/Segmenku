@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class UserRole(Enum):
     ADMIN = 'admin'
     USER = 'user'
-    MARKETING = 'marketing'  # Added missing MARKETING role
-    MANAGEMENT = 'management'  # Added missing MANAGEMENT role
+    MARKETING = 'marketing'
+    MANAGEMENT = 'management'
 
 class UserStatus(Enum):
     ACTIVE = 'active'
@@ -168,11 +168,11 @@ def main_menu():
     st.sidebar.title("Menu Utama")
     user_data = st.session_state.get('user_data', {})
 
-    if user_data['role'] == UserRole.ADMIN.value:
+    if user_data.get('role') == UserRole.ADMIN.value:
         menu_options = ["Dashboard", "Manajemen Data", "Manajemen Pengguna", "Logout"]
-    elif user_data['role'] == UserRole.MARKETING.value:
+    elif user_data.get('role') == UserRole.MARKETING.value:
         menu_options = ["Dashboard", "Segmentasi Nasabah", "Rekomendasi Produk", "Logout"]
-    else:  # MANAGEMENT
+    else:  # MANAGEMENT or other roles
         menu_options = ["Dashboard", "Laporan", "Visualisasi", "Logout"]
 
     selected_menu = st.sidebar.radio("Pilihan Menu", menu_options)
@@ -199,11 +199,11 @@ def show_dashboard():
 
     with col2:
         st.subheader("Quick Actions")
-        if user_data['role'] == UserRole.ADMIN.value:
+        if user_data.get('role') == UserRole.ADMIN.value:
             if st.button("Manajemen Pengguna"):
                 st.session_state['current_page'] = "Manajemen Pengguna"
                 st.rerun()
-        elif user_data['role'] == UserRole.MARKETING.value:
+        elif user_data.get('role') == UserRole.MARKETING.value:
             if st.button("Segmentasi Nasabah"):
                 st.session_state['current_page'] = "Segmentasi Nasabah"
                 st.rerun()
