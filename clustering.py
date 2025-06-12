@@ -15,7 +15,7 @@ class SegmentasiNasabah:
         self.jumlah_klaster = jumlah_klaster
         self.model = KMeans(n_clusters=jumlah_klaster, random_state=42)
         self.label_klaster = None
-        self.fitur_numerik = ['usia', 'saldo', 'durasi', 'frekuensi_transaksi']
+        self.fitur_numerik = ['age', 'balance', 'duration', 'campaign']
         self.metrik_evaluasi = {}
 
     def praproses_data(self) -> Tuple[bool, Optional[pd.DataFrame], str]:
