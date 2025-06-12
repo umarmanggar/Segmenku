@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 class UserRole(Enum):
     ADMIN = 'admin'
     USER = 'user'
+    MARKETING = 'marketing'  # Added missing MARKETING role
+    MANAGEMENT = 'management'  # Added missing MANAGEMENT role
 
 class UserStatus(Enum):
     ACTIVE = 'active'
@@ -82,6 +84,24 @@ class UserManagement:
             'created_at': user.created_at
         }
 
+    def get_daftar_pengguna(self):
+        """Get list of users as DataFrame"""
+        try:
+            users_data = []
+            for username, user in self.users.items():
+                users_data.append({
+                    'Username': user.username,
+                    'Nama Lengkap': user.full_name,
+                    'Email': user.email,
+                    'Role': user.role.value,
+                    'Status': user.status.value,
+                    'Dibuat': user.created_at
+                })
+            df = pd.DataFrame(users_data)
+            return True, df, "Data pengguna berhasil dimuat"
+        except Exception as e:
+            return False, None, f"Error: {str(e)}"
+
 class MainApplication:
     def __init__(self):
         if 'user_mgmt' not in st.session_state:
@@ -97,6 +117,18 @@ class MainApplication:
             page_icon="🏦",
             layout="wide"
         )
+
+# Initialize session state
+def initialize_session_state():
+    """Initialize session state variables"""
+    if 'user_mgmt' not in st.session_state:
+        st.session_state.user_mgmt = UserManagement()
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {}
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'Dashboard'
 
 # Fungsi utilitas
 def to_excel(df):
@@ -127,9 +159,10 @@ def show_login():
                 st.session_state['user_data'] = user_data
                 st.success(message)
                 time.sleep(1)
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error(message)
+
 # Menu utama berdasarkan role
 def main_menu():
     st.sidebar.title("Menu Utama")
@@ -146,9 +179,10 @@ def main_menu():
 
     if selected_menu == "Logout":
         st.session_state.clear()
+        initialize_session_state()  # Re-initialize after clearing
         st.success("Anda telah logout")
         time.sleep(1)
-        st.experimental_rerun()
+        st.rerun()
 
     return selected_menu
 
@@ -168,11 +202,11 @@ def show_dashboard():
         if user_data['role'] == UserRole.ADMIN.value:
             if st.button("Manajemen Pengguna"):
                 st.session_state['current_page'] = "Manajemen Pengguna"
-                st.experimental_rerun()
+                st.rerun()
         elif user_data['role'] == UserRole.MARKETING.value:
             if st.button("Segmentasi Nasabah"):
                 st.session_state['current_page'] = "Segmentasi Nasabah"
-                st.experimental_rerun()
+                st.rerun()
 
     st.markdown("---")
     st.subheader("Statistik Sistem")
@@ -189,7 +223,11 @@ def show_dashboard():
 def show_data_management():
     st.title("Manajemen Data Nasabah")
 
-    from dataload import DataProcessor
+    try:
+        from dataload import DataProcessor
+    except ImportError:
+        st.error("Module 'dataload' tidak ditemukan. Pastikan file dataload.py ada di direktori yang sama.")
+        return
 
     uploaded_file = st.file_uploader("Upload File CSV Nasabah", type=["csv"])
 
@@ -237,7 +275,9 @@ def show_data_management():
             else:
                 st.error(message)
         except Exception as e:
-            st.error(f"Error processing data: {str(e)}")# Halaman segmentasi nasabah
+            st.error(f"Error processing data: {str(e)}")
+
+# Halaman segmentasi nasabah
 def show_segmentation():
     st.title("Segmentasi Nasabah")
 
@@ -250,10 +290,14 @@ def show_segmentation():
     st.subheader("Parameter Segmentasi")
     n_clusters = st.slider("Jumlah Klaster", 2, 6, 4)
 
-    from clustering import SegmentasiNasabah
+    try:
+        from clustering import SegmentasiNasabah
+    except ImportError:
+        st.error("Module 'clustering' tidak ditemukan. Pastikan file clustering.py ada di direktori yang sama.")
+        return
+
     if st.button("Jalankan Segmentasi"):
         with st.spinner("Sedang memproses segmentasi..."):
-            global segmentasi
             segmentasi = SegmentasiNasabah(df, n_clusters)
             success, df_result, message = segmentasi.jalankan_segmentasi()
 
@@ -266,12 +310,14 @@ def show_segmentation():
                 st.dataframe(df_result[['Klaster'] + segmentasi.fitur_numerik].head())
 
                 # Visualisasi
-                from visualisasi import VisualisasiData
-                global visualisasi
-                visualisasi = VisualisasiData(df_result)
-                success_viz, img_base64, msg_viz = visualisasi.buat_pie_chart_klaster()
-                if success_viz:
-                    st.image(BytesIO(base64.b64decode(img_base64)), caption="Distribusi Klaster")
+                try:
+                    from visualisasi import VisualisasiData
+                    visualisasi = VisualisasiData(df_result)
+                    success_viz, img_base64, msg_viz = visualisasi.buat_pie_chart_klaster()
+                    if success_viz:
+                        st.image(BytesIO(base64.b64decode(img_base64)), caption="Distribusi Klaster")
+                except ImportError:
+                    st.warning("Module 'visualisasi' tidak ditemukan untuk menampilkan grafik.")
 
                 # Simpan hasil
                 if st.button("Simpan Hasil Segmentasi"):
@@ -292,10 +338,14 @@ def show_recommendation():
         return
 
     df = st.session_state['df']
-    from rekomendasi import SistemRekomendasi
-    import base64
+
+    try:
+        from rekomendasi import SistemRekomendasi
+    except ImportError:
+        st.error("Module 'rekomendasi' tidak ditemukan. Pastikan file rekomendasi.py ada di direktori yang sama.")
+        return
+
     st.subheader("Sistem Rekomendasi Produk")
-    global sistem_rekomendasi
     sistem_rekomendasi = SistemRekomendasi(df)
 
     # Buat rekomendasi
