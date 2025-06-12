@@ -27,8 +27,8 @@ class User:
         self.role = role
         self.status = status
         self.full_name = kwargs.get('full_name', '')
-        self.email = kwargs.get('email', '')
-        self.phone = kwargs.get('phone', '')
+        self.email = kwargs.get('email', ' ')
+        self.phone = kwargs.get('phone', ' ')
         self.created_at = datetime.now().isoformat()
 
 class UserManagement:
