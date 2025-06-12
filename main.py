@@ -300,6 +300,12 @@
 
 # DIUBAH: Mengimplementasikan UI untuk Tambah, Edit, dan Hapus Pengguna di halaman Manajemen Pengguna.
 
+# File: main.py
+# Deskripsi: File utama aplikasi Streamlit.
+# DIUBAH:
+# 1. Menggunakan struktur Class MainApplication untuk merapikan kode.
+# 2. Menghapus nilai default pada form login agar tampil kosong.
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -307,23 +313,12 @@ import time
 from io import BytesIO
 import base64
 
+# --- Impor Modul Aplikasi ---
 from user_management import UserManagement, UserRole, UserStatus
 from dataload import DataProcessor
 from clustering import SegmentasiNasabah
 from visualisasi import VisualisasiData
 from rekomendasi import SistemRekomendasi
-
-def initialize_session_state():
-    if 'user_mgmt' not in st.session_state:
-        st.session_state.user_mgmt = UserManagement()
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
-    if 'user_info' not in st.session_state:
-        st.session_state.user_info = None
-    if 'app_data' not in st.session_state:
-        st.session_state.app_data = None
-    if 'processed_data' not in st.session_state:
-        st.session_state.processed_data = None
 
 def get_table_download_link(df, filename, text):
     if df is None: return ""
@@ -332,11 +327,13 @@ def get_table_download_link(df, filename, text):
     return f'<a href="data:file/csv;base64,{b64}" download="{filename}">{text}</a>'
 
 def show_login_page():
-    st.set_page_config(page_title="Login - Segmentasi Nasabah", layout="centered")
+    """Menampilkan form login."""
     st.title("Sistem Segmentasi & Rekomendasi Nasabah")
+
     with st.form("login_form"):
-        username = st.text_input("Username", key="login_user", value="admin")
-        password = st.text_input("Password", type="password", key="login_pass", value="admin123")
+        username = st.text_input("Username", key="login_user")
+        password = st.text_input("Password", type="password", key="login_pass")
+
         submitted = st.form_submit_button("Login")
         if submitted:
             user_mgmt = st.session_state.user_mgmt
@@ -349,24 +346,24 @@ def show_login_page():
                 st.error(message)
 
 def main_sidebar():
+    """Menampilkan sidebar dan menu navigasi."""
     user_info = st.session_state.user_info
     user_role = user_info['role']
     st.sidebar.title(f"Menu - {user_role.capitalize()}")
+
     if user_role == UserRole.ADMIN.value:
         options = ["Dashboard", "Manajemen Data", "Segmentasi Nasabah", "Rekomendasi Produk", "Laporan & Visualisasi", "Manajemen Pengguna"]
     elif user_role == UserRole.MARKETING.value:
         options = ["Dashboard", "Segmentasi Nasabah", "Rekomendasi Produk"]
-    elif user_role == UserRole.MANAGEMENT.value:
-        options = ["Dashboard", "Laporan & Visualisasi"]
     else:
-        options = ["Dashboard"]
+        options = ["Dashboard", "Laporan & Visualisasi"]
+
     choice = st.sidebar.radio("Navigasi", options)
     st.sidebar.markdown("---")
     if st.sidebar.button("Logout"):
         keys_to_keep = ['user_mgmt']
         for key in list(st.session_state.keys()):
             if key not in keys_to_keep: del st.session_state[key]
-        initialize_session_state()
         st.rerun()
     return choice
 
@@ -374,7 +371,7 @@ def show_dashboard():
     st.title(f"👋 Halo, {st.session_state.user_info['full_name']}!")
     st.markdown("Selamat datang di Dashboard Sistem Segmentasi Nasabah.")
     st.subheader("Ringkasan Data Terakhir")
-    if st.session_state.app_data is not None:
+    if st.session_state.get('app_data') is not None:
         df = st.session_state.app_data
         col1, col2 = st.columns(2)
         col1.metric("Jumlah Nasabah", f"{df.shape[0]:,}")
@@ -390,6 +387,7 @@ def show_dashboard():
 
 def show_data_management():
     st.title("Шаг 1: Manajemen dan Proses Data")
+    # ... (Sama seperti sebelumnya)
     st.markdown("Unggah file `bank.csv` untuk memulai analisis.")
     uploaded_file = st.file_uploader("Unggah file CSV nasabah", type=["csv"])
     if uploaded_file:
@@ -415,6 +413,7 @@ def show_data_management():
 
 def show_segmentation():
     st.title("Шаг 2: Segmentasi Nasabah")
+    # ... (Sama seperti sebelumnya)
     if st.session_state.processed_data is None:
         st.warning("Data belum diproses. Kembali ke 'Manajemen Data'."); return
     st.subheader("Parameter K-Means")
@@ -433,6 +432,7 @@ def show_segmentation():
 
 def show_recommendation():
     st.title("Шаг 3: Rekomendasi Produk")
+    # ... (Sama seperti sebelumnya)
     if st.session_state.app_data is None or 'Klaster' not in st.session_state.app_data.columns:
         st.warning("Data belum disegmentasi. Lakukan di 'Segmentasi Nasabah'."); return
     recommender = SistemRekomendasi(st.session_state.app_data)
@@ -445,6 +445,7 @@ def show_recommendation():
 
 def show_visualization():
     st.title("Шаг 4: Laporan dan Visualisasi")
+    # ... (Sama seperti sebelumnya)
     if st.session_state.app_data is None or 'Klaster' not in st.session_state.app_data.columns:
         st.warning("Data belum disegmentasi."); return
     visualizer = VisualisasiData(st.session_state.app_data)
@@ -461,22 +462,16 @@ def show_visualization():
         if success_bar: st.image(BytesIO(base64.b64decode(bar_chart)))
         else: st.error(msg_bar)
 
-# Halaman: Manajemen Pengguna (Skenario MU-01)
 def show_user_management():
     st.title("Manajemen Pengguna")
+    # ... (Sama seperti sebelumnya)
     if st.session_state.user_info['role'] != UserRole.ADMIN.value:
         st.error("Hanya Admin yang dapat mengakses halaman ini."); return
-
     user_mgmt = st.session_state.user_mgmt
-
-    # --- UI dengan Tab untuk setiap fungsi ---
     tab1, tab2, tab3 = st.tabs(["👥 Daftar Pengguna", "➕ Tambah Pengguna", "✏️ Edit & Hapus Pengguna"])
-
     with tab1:
         st.subheader("Daftar Pengguna Saat Ini")
         st.dataframe(user_mgmt.get_user_list_df(), use_container_width=True)
-
-    # --- Implementasi Tambah Pengguna (Test Case MU_01-03) ---
     with tab2:
         st.subheader("Form Tambah Pengguna Baru")
         with st.form("add_user_form", clear_on_submit=True):
@@ -486,60 +481,32 @@ def show_user_management():
             add_email = st.text_input("Email")
             add_role = st.selectbox("Peran (Role)", [role.value for role in UserRole])
             add_submitted = st.form_submit_button("Tambah Pengguna")
-
             if add_submitted:
-                success, message = user_mgmt.add_user(
-                    username=add_username,
-                    password=add_password,
-                    role=UserRole(add_role),
-                    full_name=add_full_name,
-                    email=add_email
-                )
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
-
-    # --- Implementasi Edit & Hapus Pengguna (Test Case MU_01-04 & MU_01-05) ---
+                success, message = user_mgmt.add_user(username=add_username, password=add_password, role=UserRole(add_role), full_name=add_full_name, email=add_email)
+                if success: st.success(message)
+                else: st.error(message)
     with tab3:
         st.subheader("Edit atau Hapus Pengguna")
-
         usernames = user_mgmt.get_all_usernames()
         username_to_action = st.selectbox("Pilih Pengguna", options=usernames, index=0, key="user_select_action")
-
         if username_to_action:
             user_to_edit = user_mgmt.get_user(username_to_action)
             if user_to_edit:
-
-                # Form untuk Edit
                 with st.form("edit_user_form"):
                     st.write(f"Mengedit Pengguna: **{user_to_edit.username}**")
                     edit_full_name = st.text_input("Nama Lengkap", value=user_to_edit.full_name)
                     edit_email = st.text_input("Email", value=user_to_edit.email)
-
                     role_values = [r.value for r in UserRole]
                     current_role_index = role_values.index(user_to_edit.role.value)
                     edit_role = st.selectbox("Peran (Role)", role_values, index=current_role_index)
-
                     edit_password = st.text_input("Password Baru (kosongkan jika tidak diubah)", type="password")
-
                     edit_submitted = st.form_submit_button("Simpan Perubahan")
                     if edit_submitted:
-                        new_data = {
-                            "full_name": edit_full_name,
-                            "email": edit_email,
-                            "role": edit_role,
-                            "password": edit_password if edit_password else None
-                        }
+                        new_data = {"full_name": edit_full_name, "email": edit_email, "role": edit_role, "password": edit_password if edit_password else None}
                         success, message = user_mgmt.edit_user(username_to_action, new_data)
-                        if success:
-                            st.success(message)
-                        else:
-                            st.error(message)
-
+                        if success: st.success(message)
+                        else: st.error(message)
                 st.markdown("---")
-
-                # Opsi untuk Hapus
                 st.subheader(f"Hapus Pengguna: {user_to_edit.username}")
                 if user_to_edit.role == UserRole.ADMIN:
                     st.warning("Akun Administrator utama tidak dapat dihapus.")
@@ -549,29 +516,58 @@ def show_user_management():
                         admin_username = st.session_state.user_info['username']
                         success, message = user_mgmt.delete_user(username_to_action, admin_username)
                         if success:
-                            st.success(message)
-                            st.rerun() # Refresh halaman untuk update daftar
+                            st.success(message); st.rerun()
                         else:
                             st.error(message)
 
-def main():
-    initialize_session_state()
-    if not st.session_state.logged_in:
-        show_login_page()
-    else:
-        st.set_page_config(page_title="Dashboard - Segmentasi Nasabah", layout="wide")
-        choice = main_sidebar()
-        page_map = {
-            "Dashboard": show_dashboard,
-            "Manajemen Data": show_data_management,
-            "Segmentasi Nasabah": show_segmentation,
-            "Rekomendasi Produk": show_recommendation,
-            "Laporan & Visualisasi": show_visualization,
-            "Manajemen Pengguna": show_user_management
-        }
-        page_function = page_map.get(choice)
-        if page_function:
-            page_function()
+# DIUBAH: Menggunakan struktur Class untuk aplikasi utama
+class MainApplication:
+    def __init__(self):
+        """Inisialisasi aplikasi, termasuk session state."""
+        self.initialize_state()
 
+    def initialize_state(self):
+        """Fungsi terpisah untuk inisialisasi state."""
+        if 'user_mgmt' not in st.session_state:
+            st.session_state.user_mgmt = UserManagement()
+        if 'logged_in' not in st.session_state:
+            st.session_state.logged_in = False
+        if 'user_info' not in st.session_state:
+            st.session_state.user_info = None
+        if 'app_data' not in st.session_state:
+            st.session_state.app_data = None
+        if 'processed_data' not in st.session_state:
+            st.session_state.processed_data = None
+
+    def run(self):
+        """
+        Metode utama untuk menjalankan aplikasi.
+        Mengatur konfigurasi halaman dan alur logika.
+        """
+        # Menjalankan set_page_config di awal
+        st.set_page_config(
+            page_title="Sistem Rekomendasi Produk Bank",
+            page_icon="🏦",
+            layout="wide"
+        )
+
+        if not st.session_state.logged_in:
+            show_login_page()
+        else:
+            choice = main_sidebar()
+            page_map = {
+                "Dashboard": show_dashboard,
+                "Manajemen Data": show_data_management,
+                "Segmentasi Nasabah": show_segmentation,
+                "Rekomendasi Produk": show_recommendation,
+                "Laporan & Visualisasi": show_visualization,
+                "Manajemen Pengguna": show_user_management
+            }
+            page_function = page_map.get(choice)
+            if page_function:
+                page_function()
+
+# DIUBAH: Logika eksekusi utama menjadi lebih sederhana
 if __name__ == "__main__":
-    main()
+    app = MainApplication()
+    app.run()
