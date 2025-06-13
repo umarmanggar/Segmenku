@@ -1,4 +1,10 @@
 **Readme: Sistem Segmentasi & Rekomendasi Nasabah**
+**Kelompok Ketoprak GBA""
+Anggota:
+1. Rifki Arif Febrian - 103052300041
+2. Raya Ramadha Fitroh - 103052300024
+3. Enuka Lula Ansori - 103052300070
+4. Muhammad Umar - 103052330102
 
 **Deskripsi Sistem**
 Sistem ini dirancang untuk melakukan segmentasi nasabah dan memberikan rekomendasi produk berdasarkan karakteristik masing-masing segmen. Sistem ini mencakup proses mulai dari unggah data, pemrosesan data, segmentasi, hingga visualisasi dan rekomendasi produk.
