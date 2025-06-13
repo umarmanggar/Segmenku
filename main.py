@@ -299,7 +299,7 @@
 
 
 # File: main.py
-# PERBAIKAN: Memperbaiki AttributeError karena kesalahan nama fungsi page_laporan.
+# PERBAIKAN: Memperbaiki AttributeError karena kesalahan nama fungsi page_laporan yang sesuai
 
 import streamlit as st
 import pandas as pd
