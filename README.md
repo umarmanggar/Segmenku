@@ -61,3 +61,10 @@ Sistem ini dirancang untuk melakukan segmentasi nasabah dan memberikan rekomenda
   
 **Catatan**
       - Sistem hanya mendukung file CSV hingga 200MB
+
+
+**LAMPIRAN**
+
+Laporan SRS: https://telkomuniversityofficial-my.sharepoint.com/:b:/g/personal/umarmanggar_student_telkomuniversity_ac_id/EXK3jLLKzcFCv_3dvhPrku0BIKH_4qnX5GOTNv6MM_m4bA?e=ZoCXxh
+
+Laporan Testing: https://telkomuniversityofficial-my.sharepoint.com/:x:/g/personal/umarmanggar_student_telkomuniversity_ac_id/EXxpRkuLqN9AtK8jC-ChLBcBoCGRP4QLssVOTvbIp_CLgw?e=MmhmUb
