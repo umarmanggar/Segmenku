@@ -1,5 +1,5 @@
 **Readme: Sistem Segmentasi & Rekomendasi Nasabah**
-**Kelompok Ketoprak GBA""
+**Kelompok Ketoprak GBA**
 Anggota:
 1. Rifki Arif Febrian - 103052300041
 2. Raya Ramadha Fitroh - 103052300024
