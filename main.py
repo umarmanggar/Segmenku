@@ -307,15 +307,19 @@ import numpy as np
 from typing import Dict
 from io import BytesIO
 import base64
+# --- MODIFIKASI ---
+# Impor OneHotEncoder untuk kalkulasi dimensi
+from sklearn.preprocessing import OneHotEncoder
 
 # --- Impor Modul Aplikasi ---
+# Anggap semua impor ini sudah benar dan file-nya ada
 from user_management import UserManagement, UserRole
 from dataload import DataProcessor
 from clustering import Segmenter
 from visualisasi import VisualisasiData
 from rekomendasi import SistemRekomendasi, RekomendasiIndividual
 
-# --- Inisialisasi State Aplikasi ---
+# --- Inisialisasi State Aplikasi (Tidak ada perubahan) ---
 def initialize_session_state():
     if 'user_mgmt' not in st.session_state: st.session_state.user_mgmt = UserManagement()
     if 'logged_in' not in st.session_state: st.session_state.logged_in = False
@@ -338,6 +342,7 @@ class MainApplication:
         st.set_page_config(page_title="Sistem Segmentasi Bank", page_icon="🏦", layout="wide")
         initialize_session_state()
 
+    # --- Tidak ada perubahan di `run`, `show_login_page`, `show_main_app` ---
     def run(self):
         if not st.session_state.logged_in:
             self.show_login_page()
@@ -368,18 +373,18 @@ class MainApplication:
                 if key != 'user_mgmt': del st.session_state[key]
             initialize_session_state(); st.rerun()
 
-        # PERBAIKAN DI SINI
         page_map = {
             "Proses Data": self.page_proses_data,
             "Segmentasi": self.page_segmentasi,
-            "Laporan & Rekomendasi Segmen": self.page_laporan, # Nama fungsi diubah ke yang benar
+            "Laporan & Rekomendasi Segmen": self.page_laporan,
             "Simulasi Rekomendasi": self.page_simulasi_rekomendasi,
             "Manajemen Pengguna": self.page_manajemen_pengguna,
         }
         page_function = page_map.get(choice)
         if page_function:
             page_function()
-
+    
+    # --- Perubahan utama ada di dalam fungsi `page_proses_data` ---
     def page_proses_data(self):
         st.title("Proses Data dan Pemilihan Fitur")
         processor = st.session_state.processor
@@ -409,28 +414,102 @@ class MainApplication:
         elif st.session_state.processing_step == '3_feature_selection':
             st.subheader("3. Pemilihan Fitur"); st.dataframe(processor.processed_data.head())
             all_cols = processor.processed_data.columns.tolist()
-            selected = st.multiselect("Pilih fitur untuk analisis:", options=all_cols, default=all_cols)
+            
+            # --- MODIFIKASI: Sarankan fitur default yang direkomendasikan ---
+            RECOMMENDED_CORE_FEATURES = ['age', 'job', 'marital', 'education', 'balance', 'housing', 'loan']
+            # Pilih fitur rekomendasi yang ada di dalam kolom data
+            default_selection = [col for col in RECOMMENDED_CORE_FEATURES if col in all_cols]
+            
+            selected = st.multiselect("Pilih fitur untuk analisis:", options=all_cols, default=default_selection)
+            
             if st.button("Simpan Fitur & Lanjutkan"):
                 success, msg = processor.select_features(selected)
                 if success: st.success(msg); st.session_state.processing_step = '4_transform'; st.rerun()
                 else: st.error(msg)
 
         elif st.session_state.processing_step == '4_transform':
-            st.subheader("4. Transformasi Data"); st.dataframe(processor.processed_data.head())
+            st.subheader("4. Transformasi Data")
+            
+            # --- MODIFIKASI DIMULAI ---
+            
+            # Definisikan konstanta untuk peringatan
+            RISKY_FEATURES = ['duration']
+            DIMENSION_WARNING_THRESHOLD = 30
+            
+            # Dapatkan data yang sudah dipilih fiturnya
+            data_to_transform = processor.processed_data
+            selected_features = data_to_transform.columns.tolist()
+
+            # Kotak untuk analisis dan peringatan
+            with st.container(border=True):
+                st.info("Analisis Fitur Pilihan Anda")
+                
+                # Peringatan untuk fitur berisiko
+                for feature in RISKY_FEATURES:
+                    if feature in selected_features:
+                        st.warning(f"""**Peringatan Fitur Berisiko:** Fitur '{feature}' terdeteksi. 
+                                   Fitur ini tidak disarankan untuk segmentasi umum karena sangat berkorelasi dengan hasil akhir
+                                   dan tidak mendeskripsikan profil nasabah sebelum dihubungi.""")
+
+                # Kalkulasi dimensi setelah One-Hot Encoding
+                categorical_features = data_to_transform.select_dtypes(include=['object', 'category']).columns
+                numerical_features = data_to_transform.select_dtypes(include=np.number).columns
+                
+                total_dimensions = len(numerical_features)
+                num_encoded_features = 0
+
+                if not categorical_features.empty:
+                    try:
+                        temp_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+                        temp_encoder.fit(data_to_transform[categorical_features])
+                        num_encoded_features = len(temp_encoder.get_feature_names_out(categorical_features))
+                        total_dimensions += num_encoded_features
+                    except Exception as e:
+                        st.error(f"Gagal menghitung dimensi fitur kategorikal: {e}")
+
+                # Tampilkan hasil analisis dimensi
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Fitur Numerik", len(numerical_features))
+                col2.metric("Fitur Kategorikal", len(categorical_features))
+                col3.metric("TOTAL DIMENSI AKHIR", total_dimensions)
+                
+                # Peringatan "Curse of Dimensionality"
+                if total_dimensions > DIMENSION_WARNING_THRESHOLD:
+                    st.error(f"""**Peringatan Dimensi Tinggi:** Total dimensi akhir ({total_dimensions}) melebihi batas wajar ({DIMENSION_WARNING_THRESHOLD}). 
+                             Ini dapat menurunkan kualitas segmentasi karena 'Curse of Dimensionality'. Pertimbangkan untuk mengurangi jumlah fitur.""")
+            
+            # Tombol untuk kembali dan mengubah pilihan fitur
+            if st.button("⬅️ Kembali untuk Ubah Fitur"):
+                st.session_state.processing_step = '3_feature_selection'
+                st.rerun()
+
+            # --- MODIFIKASI SELESAI ---
+
+            st.markdown("---")
+            st.dataframe(processor.processed_data.head()) # Tampilkan data seperti sebelumnya
             scaler = st.radio("Metode Scaling:", ['StandardScaler (Z-score)', 'MinMaxScaler'])
+            
             if st.button("Selesaikan Proses"):
                 success, msg = processor.transform_data(scaler)
                 if success:
-                    st.success(msg); st.session_state.final_data = processor.processed_data
-                    st.session_state.processing_step = '5_done'; st.balloons(); st.rerun()
-                else: st.error(msg)
+                    st.success(msg)
+                    st.session_state.final_data = processor.processed_data
+                    st.session_state.processing_step = '5_done'
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error(msg)
 
         elif st.session_state.processing_step == '5_done':
-            st.header("✅ Proses Data Selesai"); st.dataframe(st.session_state.final_data.head())
+            st.header("✅ Proses Data Selesai")
+            st.dataframe(st.session_state.final_data.head())
             if st.button("Ulangi Proses"):
-                st.session_state.processor = DataProcessor(); st.session_state.processing_step = '1_upload'
-                st.session_state.final_data = None; st.rerun()
+                st.session_state.processor = DataProcessor()
+                st.session_state.processing_step = '1_upload'
+                st.session_state.final_data = None
+                st.rerun()
 
+    # --- Tidak ada perubahan di sisa fungsi (page_segmentasi, page_laporan, dst.) ---
     def page_segmentasi(self):
         st.title("Segmentasi Nasabah")
         if st.session_state.final_data is None:
@@ -444,7 +523,12 @@ class MainApplication:
             params['n_clusters'] = st.number_input("Jumlah Cluster:", min_value=2, value=3, step=1)
 
         if st.button("Jalankan Segmentasi"):
-            segmenter = Segmenter(data_asli=st.session_state.processor.raw_data.loc[st.session_state.final_data.index], data_proses=st.session_state.final_data)
+            # Pastikan data asli dan yg diproses memiliki index yg sama
+            common_index = st.session_state.processor.raw_data.index.intersection(st.session_state.final_data.index)
+            data_asli_aligned = st.session_state.processor.raw_data.loc[common_index]
+            data_proses_aligned = st.session_state.final_data.loc[common_index]
+
+            segmenter = Segmenter(data_asli=data_asli_aligned, data_proses=data_proses_aligned)
             with st.spinner(f"Menjalankan {metode}..."):
                 success, df_result, message, score = segmenter.jalankan_segmentasi(metode, params)
             if success:
